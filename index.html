@@ -471,7 +471,7 @@ function resetConnection() {
 async function initialSetup() {
   setSyncStatus('syncing', 'Setting up…');
   try {
-    await apiWrite({ action: 'setup' });
+    await apiFetch({ action: 'setup' });
     await loadAllData();
   } catch(e) {
     setSyncStatus('error', 'Connection failed');
@@ -480,68 +480,28 @@ async function initialSetup() {
 }
 
 // ── API HELPERS ──────────────────────────────────────────────
-// Google Apps Script redirects requests, which Chrome blocks with
-// fetch() cross-origin. Instead we use a hidden iframe for writes
-// (fire-and-forget) and fetch with no-cors + polling for reads.
+// Now hosted on https:// (Netlify), plain fetch works fine.
+// All actions go via GET params — no CORS preflight needed.
 
 function apiUrl(params) {
   return SCRIPT_URL + '?' + new URLSearchParams(params).toString();
 }
 
-// READ via JSONP — works cross-origin from any host
-function apiFetchRead(params) {
-  return new Promise((resolve, reject) => {
-    const cbName = '_cb_' + Date.now() + '_' + Math.floor(Math.random() * 9999);
-    const script = document.createElement('script');
-    const url = apiUrl({ ...params, callback: cbName });
-
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error('Request timed out'));
-    }, 15000); // 15 second timeout
-
-    function cleanup() {
-      clearTimeout(timer);
-      delete window[cbName];
-      if (script.parentNode) script.parentNode.removeChild(script);
-    }
-
-    window[cbName] = (data) => {
-      cleanup();
-      if (data.error) reject(new Error(data.error));
-      else resolve(data);
-    };
-
-    script.onerror = () => {
-      cleanup();
-      reject(new Error('Script load failed'));
-    };
-
-    script.src = url;
-    document.head.appendChild(script);
-  });
-}
-
-// WRITE — fire via hidden iframe, then poll getAll until the entry appears
-function apiWrite(params) {
-  return new Promise((resolve, reject) => {
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = apiUrl(params);
-    document.body.appendChild(iframe);
-    // Give the script time to execute, then resolve
-    setTimeout(() => {
-      document.body.removeChild(iframe);
-      resolve({ ok: true });
-    }, 3000);
-  });
+async function apiFetch(params) {
+  const res = await fetch(apiUrl(params), { redirect: 'follow' });
+  const text = await res.text();
+  // Strip JSONP wrapper if present (e.g. callback(...))
+  const json = text.replace(/^[^(]+\(/, '').replace(/\)\s*$/, '');
+  const data = JSON.parse(json);
+  if (data.error) throw new Error(data.error);
+  return data;
 }
 
 async function loadAllData() {
   if (!SCRIPT_URL) return;
   setSyncStatus('syncing', 'Syncing…');
   try {
-    const data = await apiFetchRead({ action: 'getAll' });
+    const data = await apiFetch({ action: 'getAll' });
     // Normalise date field — Sheets may return a full date string, extract YYYY-MM-DD
     allEntries = (data.entries || []).map(e => ({
       ...e,
@@ -553,6 +513,7 @@ async function loadAllData() {
   } catch(e) {
     console.error('Sync error:', e);
     setSyncStatus('error', 'Sync failed — ' + e.message);
+    showToast('Sync failed: ' + e.message, 'error');
   }
 }
 
@@ -721,7 +682,7 @@ async function recordTransaction(type) {
 
   setSyncStatus('syncing', 'Saving…');
   try {
-    await apiWrite({
+    await apiFetch({
       action:    'addEntry',
       entryId,
       productId: selectedId,
@@ -744,7 +705,7 @@ async function deleteEntry(entryId) {
   if (!SCRIPT_URL) return;
   setSyncStatus('syncing', 'Deleting…');
   try {
-    await apiWrite({ action: 'deleteEntry', entryId });
+    await apiFetch({ action: 'deleteEntry', entryId });
     showToast('Entry deleted.', 'success');
     await loadAllData();
   } catch(e) {
