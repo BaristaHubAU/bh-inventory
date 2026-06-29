@@ -479,22 +479,44 @@ async function initialSetup() {
   }
 }
 
-// ── API HELPERS ──────────────────────────────────────────────
-// Now hosted on https:// (Netlify), plain fetch works fine.
-// All actions go via GET params — no CORS preflight needed.
+// ── API HELPER ───────────────────────────────────────────────
+// Uses JSONP (script tag) for all requests — works on every
+// device and browser without CORS or redirect issues.
 
 function apiUrl(params) {
   return SCRIPT_URL + '?' + new URLSearchParams(params).toString();
 }
 
-async function apiFetch(params) {
-  const res = await fetch(apiUrl(params), { redirect: 'follow' });
-  const text = await res.text();
-  // Strip JSONP wrapper if present (e.g. callback(...))
-  const json = text.replace(/^[^(]+\(/, '').replace(/\)\s*$/, '');
-  const data = JSON.parse(json);
-  if (data.error) throw new Error(data.error);
-  return data;
+function apiFetch(params) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_cb_' + Date.now() + '_' + Math.floor(Math.random() * 99999);
+    const script = document.createElement('script');
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Request timed out after 20s'));
+    }, 20000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[cbName] = (data) => {
+      cleanup();
+      if (data.error) reject(new Error(data.error));
+      else resolve(data);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('Script load failed'));
+    };
+
+    script.src = apiUrl({ ...params, callback: cbName });
+    document.head.appendChild(script);
+  });
 }
 
 async function loadAllData() {
