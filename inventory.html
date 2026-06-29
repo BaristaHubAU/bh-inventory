@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Barista Hub — Inventory</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --gold: #c8a84b;
+    --gold-dim: rgba(200,168,75,0.15);
+    --black: #0f0f0f;
+    --surface: #161616;
+    --surface2: #1e1e1e;
+    --surface3: #252525;
+    --border: rgba(255,255,255,0.08);
+    --text: #f0f0f0;
+    --text-muted: #999;
+    --red: #e05252;
+    --green: #52c97a;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--black);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo-mark {
+    width: 40px; height: 40px;
+    border: 2px solid var(--gold);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Playfair Display', serif;
+    font-size: 15px; color: var(--gold); font-weight: 600;
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px; font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  header h1 span { color: var(--gold); }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+  .sync-status {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 13px; color: var(--text-muted);
+  }
+  .sync-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .sync-dot.ok    { background: var(--green); }
+  .sync-dot.error { background: var(--red); }
+  .sync-dot.syncing { background: var(--gold); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  #search-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 9px 14px;
+    border-radius: 6px;
+    font-size: 15px;
+    font-family: 'Inter', sans-serif;
+    width: 220px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #search-input::placeholder { color: var(--text-muted); }
+  #search-input:focus { border-color: var(--gold); }
+
+  /* ── SETUP BANNER ── */
+  #setup-banner {
+    background: #1a1500;
+    border-bottom: 1px solid var(--gold);
+    padding: 14px 28px;
+    display: flex; align-items: center; gap: 14px;
+    font-size: 14px;
+  }
+  #setup-banner.hidden { display: none; }
+  #setup-banner strong { color: var(--gold); }
+  #setup-banner input {
+    flex: 1; max-width: 520px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 9px 13px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+  }
+  #setup-banner input:focus { border-color: var(--gold); }
+  .btn-setup {
+    padding: 9px 20px;
+    background: var(--gold);
+    color: #0f0f0f;
+    border: none; border-radius: 6px;
+    font-size: 14px; font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-setup:hover { opacity: 0.85; }
+  .btn-reset {
+    padding: 8px 14px;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    white-space: nowrap;
+  }
+  .btn-reset:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* ── LAYOUT ── */
+  .app {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    min-height: calc(100vh - 73px);
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    max-height: calc(100vh - 73px);
+    position: sticky;
+    top: 73px;
+  }
+  .sidebar-header {
+    padding: 18px 18px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .sidebar-header h2 {
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .total-value { font-size: 12px; color: var(--gold); font-weight: 500; }
+
+  .product-group-label {
+    padding: 14px 18px 6px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--gold);
+    border-top: 1px solid var(--border);
+  }
+  .product-group:first-child .product-group-label { border-top: none; }
+
+  .product-row {
+    padding: 11px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-left: 3px solid transparent;
+  }
+  .product-row:hover { background: var(--surface2); }
+  .product-row.active { background: var(--gold-dim); border-left-color: var(--gold); }
+  .product-row.hidden { display: none; }
+  .product-name { font-size: 15px; color: var(--text); }
+  .stock-badge {
+    font-size: 14px; font-weight: 600;
+    min-width: 32px; text-align: right;
+  }
+  .stock-badge.ok   { color: var(--green); }
+  .stock-badge.low  { color: var(--gold); }
+  .stock-badge.zero { color: var(--red); }
+
+  /* ── MAIN PANEL ── */
+  .main { padding: 32px 40px; overflow-y: auto; }
+
+  .empty-state {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 60vh; gap: 16px;
+    color: var(--text-muted); text-align: center;
+  }
+  .empty-state .icon { font-size: 52px; opacity: 0.3; }
+  .empty-state p { font-size: 16px; }
+
+  .product-title { margin-bottom: 24px; }
+  .product-title h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 30px; font-weight: 600; margin-bottom: 4px;
+  }
+  .product-title p { font-size: 15px; color: var(--text-muted); }
+
+  .gold-line {
+    height: 2px;
+    background: linear-gradient(90deg, var(--gold), transparent);
+    margin-bottom: 24px; border-radius: 2px;
+  }
+
+  /* ── STAT CARDS ── */
+  .stock-summary {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 16px; margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px;
+  }
+  .stat-card .label {
+    font-size: 12px; font-weight: 500;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 8px;
+  }
+  .stat-card .value {
+    font-size: 36px; font-weight: 300;
+  }
+  .stat-card.current .value { color: var(--text); }
+  .stat-card.added   .value { color: var(--green); }
+  .stat-card.removed .value { color: var(--red); }
+
+  /* ── TRANSACTION FORM ── */
+  .transaction-form {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 24px; margin-bottom: 28px;
+  }
+  .transaction-form h3 {
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 20px;
+  }
+  .form-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px; margin-bottom: 16px;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 7px; }
+  .form-group label {
+    font-size: 12px; font-weight: 500;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .form-group input, .form-group select, .form-group textarea {
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 11px 13px;
+    border-radius: 6px;
+    font-size: 15px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: var(--gold);
+  }
+  .form-group select option { background: var(--surface3); }
+  .form-group textarea { resize: vertical; min-height: 76px; }
+  .btn-row { display: flex; gap: 12px; margin-top: 18px; }
+  .btn {
+    padding: 12px 28px;
+    border: none; border-radius: 6px;
+    font-size: 15px; font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    letter-spacing: 0.03em;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:active { transform: scale(0.98); }
+  .btn-add    { background: var(--green); color: #0f0f0f; }
+  .btn-remove { background: var(--red);   color: #fff; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── LOG TABLE ── */
+  .log-section h3 {
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 14px;
+  }
+  .log-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .log-table th {
+    text-align: left; padding: 10px 14px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-muted); border-bottom: 1px solid var(--border);
+  }
+  .log-table td {
+    padding: 13px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top; line-height: 1.5;
+  }
+  .log-table tr:last-child td { border-bottom: none; }
+  .log-table tr:hover td { background: var(--surface2); }
+  .tag-add {
+    display: inline-block;
+    background: rgba(82,201,122,0.15); color: var(--green);
+    border-radius: 4px; padding: 3px 9px;
+    font-weight: 600; font-size: 14px;
+  }
+  .tag-remove {
+    display: inline-block;
+    background: rgba(224,82,82,0.15); color: var(--red);
+    border-radius: 4px; padding: 3px 9px;
+    font-weight: 600; font-size: 14px;
+  }
+  .comment-cell { color: var(--text-muted); font-size: 14px; max-width: 280px; }
+  .empty-log { text-align: center; padding: 48px; color: var(--text-muted); font-size: 15px; }
+  .delete-btn {
+    background: none; border: none;
+    color: var(--text-muted); cursor: pointer;
+    font-size: 15px; padding: 3px 7px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .delete-btn:hover { color: var(--red); background: rgba(224,82,82,0.1); }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 28px; right: 28px;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 13px 22px; border-radius: 8px;
+    font-size: 15px; font-weight: 500;
+    opacity: 0; transform: translateY(8px);
+    transition: opacity 0.25s, transform 0.25s;
+    pointer-events: none; z-index: 999;
+  }
+  #toast.show    { opacity: 1; transform: translateY(0); }
+  #toast.success { border-color: var(--green); color: var(--green); }
+  #toast.error   { border-color: var(--red);   color: var(--red); }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { position: relative; top: auto; max-height: 280px; }
+    .main { padding: 24px 18px; }
+    .stock-summary { grid-template-columns: 1fr 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+    #search-input { width: 150px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">BH</div>
+  <h1>Barista Hub <span>/ Inventory</span></h1>
+  <div class="header-right">
+    <div class="sync-status">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-label">Not connected</span>
+    </div>
+    <button class="btn-reset" onclick="resetConnection()">⚙ Reset Connection</button>
+    <input type="text" id="search-input" placeholder="Search products…" oninput="filterProducts(this.value)">
+  </div>
+</header>
+
+<!-- SETUP BANNER — shown until Script URL is saved -->
+<div id="setup-banner">
+  <strong>Setup:</strong>
+  <span>Paste your Apps Script Web App URL to connect Google Sheets →</span>
+  <input type="text" id="script-url-input" placeholder="https://script.google.com/macros/s/…/exec">
+  <button class="btn-setup" onclick="saveScriptUrl()">Connect</button>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>Products</h2>
+      <span class="total-value" id="total-units">—</span>
+    </div>
+    <div id="product-list"></div>
+  </aside>
+
+  <main class="main" id="main-panel">
+    <div class="empty-state">
+      <div class="icon">☕</div>
+      <p>Select a product to view stock and record transactions.</p>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── PRODUCTS ─────────────────────────────────────────────────
+const PRODUCTS = [
+  { group: 'Turin DF54',  id: 'df54-black',      name: 'DF54 — Black' },
+  { group: 'Turin DF54',  id: 'df54-white',      name: 'DF54 — White' },
+  { group: 'Turin DF54',  id: 'df54-grey',       name: 'DF54 — Grey' },
+  { group: 'Turin DF54',  id: 'df54-silver',     name: 'DF54 — Silver' },
+  { group: 'Turin DF54',  id: 'df54-milkywhite', name: 'DF54 — Milky White' },
+  { group: 'Turin DF54',  id: 'df54-yellow',     name: 'DF54 — Yellow' },
+  { group: 'Turin DF54',  id: 'df54-blue',       name: 'DF54 — Blue' },
+  { group: 'Turin DF54',  id: 'df54-green',      name: 'DF54 — Green' },
+  { group: 'Turin DF54',  id: 'df54-red',        name: 'DF54 — Red' },
+  { group: 'Turin DF64',  id: 'df64-black',      name: 'DF64 — Black' },
+  { group: 'Turin DF64',  id: 'df64-white',      name: 'DF64 — White' },
+  { group: 'Turin DF64V', id: 'df64v-black',     name: 'DF64V — Black' },
+  { group: 'Turin DF64V', id: 'df64v-silver',    name: 'DF64V — Silver' },
+  { group: 'Turin DF64V', id: 'df64v-grey',      name: 'DF64V — Grey' },
+  { group: 'Turin CF64V', id: 'cf64v-black',     name: 'CF64V — Black' },
+  { group: 'Turin CF64V', id: 'cf64v-white',     name: 'CF64V — White' },
+  { group: 'Turin CF64V', id: 'cf64v-grey',      name: 'CF64V — Grey' },
+  { group: 'Turin DF83',  id: 'df83-black',      name: 'DF83 — Black' },
+  { group: 'Turin DF83',  id: 'df83-white',      name: 'DF83 — White' },
+  { group: 'Turin DF83V', id: 'df83v-black',     name: 'DF83V — Black' },
+  { group: 'Turin DF83V', id: 'df83v-silver',    name: 'DF83V — Silver' },
+  { group: 'Turin CK74W', id: 'ck74w-black',     name: 'CK74W — Black' },
+  { group: 'Turin CK74W', id: 'ck74w-white',     name: 'CK74W — White' },
+  { group: 'Turin MC3',   id: 'mc3-black',       name: 'MC3 — Black' },
+  { group: 'Turin MC3',   id: 'mc3-white',       name: 'MC3 — White' },
+  { group: 'Balenare',    id: 'g83ew-black',     name: 'G83EW — Black' },
+  { group: 'Balenare',    id: 'g83aw-black',     name: 'G83AW — Black' },
+  { group: 'Orbiter',     id: 'ob1pro',          name: 'OB-1 Pro' },
+];
+
+// ── STATE ────────────────────────────────────────────────────
+const URL_KEY = 'bh_script_url';
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzGlWv2Ng90vO3Wc8DBlEGagFfVwRXZszI5erybHUNvDZfCoZNKmSijthYusI64t7LS/exec';
+let SCRIPT_URL = localStorage.getItem(URL_KEY) || DEFAULT_SCRIPT_URL;
+let allEntries = []; // flat array of all log entries from Sheets
+let selectedId = null;
+let isSyncing  = false;
+
+// ── SETUP ────────────────────────────────────────────────────
+function saveScriptUrl() {
+  const val = document.getElementById('script-url-input').value.trim();
+  if (!val.startsWith('https://script.google.com')) {
+    showToast('Please enter a valid Apps Script URL.', 'error'); return;
+  }
+  SCRIPT_URL = val;
+  localStorage.setItem(URL_KEY, SCRIPT_URL);
+  document.getElementById('setup-banner').classList.add('hidden');
+  initialSetup();
+}
+
+function resetConnection() {
+  if (!confirm('This will clear the saved connection URL and show the setup banner. Continue?')) return;
+  SCRIPT_URL = '';
+  localStorage.removeItem(URL_KEY);
+  allEntries = [];
+  document.getElementById('setup-banner').classList.remove('hidden');
+  // Pre-fill with old URL so user can just tweak it
+  const input = document.getElementById('script-url-input');
+  input.value = '';
+  setSyncStatus('', 'Not connected');
+  buildSidebar();
+  showToast('Connection cleared. Paste your new Script URL.', '');
+}
+
+async function initialSetup() {
+  setSyncStatus('syncing', 'Setting up…');
+  try {
+    await apiWrite({ action: 'setup' });
+    await loadAllData();
+  } catch(e) {
+    setSyncStatus('error', 'Connection failed');
+    showToast('Could not connect to Google Sheets. Check the URL.', 'error');
+  }
+}
+
+// ── API HELPERS ──────────────────────────────────────────────
+// Google Apps Script redirects requests, which Chrome blocks with
+// fetch() cross-origin. Instead we use a hidden iframe for writes
+// (fire-and-forget) and fetch with no-cors + polling for reads.
+
+function apiUrl(params) {
+  return SCRIPT_URL + '?' + new URLSearchParams(params).toString();
+}
+
+// READ via JSONP — works cross-origin from any host
+function apiFetchRead(params) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_cb_' + Date.now() + '_' + Math.floor(Math.random() * 9999);
+    const script = document.createElement('script');
+    const url = apiUrl({ ...params, callback: cbName });
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Request timed out'));
+    }, 15000); // 15 second timeout
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[cbName] = (data) => {
+      cleanup();
+      if (data.error) reject(new Error(data.error));
+      else resolve(data);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('Script load failed'));
+    };
+
+    script.src = url;
+    document.head.appendChild(script);
+  });
+}
+
+// WRITE — fire via hidden iframe, then poll getAll until the entry appears
+function apiWrite(params) {
+  return new Promise((resolve, reject) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = apiUrl(params);
+    document.body.appendChild(iframe);
+    // Give the script time to execute, then resolve
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+      resolve({ ok: true });
+    }, 3000);
+  });
+}
+
+async function loadAllData() {
+  if (!SCRIPT_URL) return;
+  setSyncStatus('syncing', 'Syncing…');
+  try {
+    const data = await apiFetchRead({ action: 'getAll' });
+    // Normalise date field — Sheets may return a full date string, extract YYYY-MM-DD
+    allEntries = (data.entries || []).map(e => ({
+      ...e,
+      date: normaliseDate(e.date),
+    }));
+    setSyncStatus('ok', 'Synced');
+    buildSidebar();
+    if (selectedId) renderMain();
+  } catch(e) {
+    console.error('Sync error:', e);
+    setSyncStatus('error', 'Sync failed — ' + e.message);
+  }
+}
+
+function normaliseDate(raw) {
+  if (!raw) return '';
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  // Try parsing full date string
+  try {
+    const d = new Date(raw);
+    if (!isNaN(d)) return d.toISOString().split('T')[0];
+  } catch(e) {}
+  return raw;
+}
+
+// ── DERIVED STATE ────────────────────────────────────────────
+function getEntriesFor(productId) {
+  return allEntries.filter(e => e.productId === productId);
+}
+
+function getStock(productId) {
+  return getEntriesFor(productId).reduce((sum, e) => sum + (e.type === 'add' ? e.qty : -e.qty), 0);
+}
+
+function stockClass(qty) {
+  if (qty <= 0) return 'zero';
+  if (qty <= 3) return 'low';
+  return 'ok';
+}
+
+// ── SIDEBAR ──────────────────────────────────────────────────
+function buildSidebar() {
+  const list = document.getElementById('product-list');
+  list.innerHTML = '';
+  const groups = {};
+  PRODUCTS.forEach(p => { if (!groups[p.group]) groups[p.group] = []; groups[p.group].push(p); });
+
+  let total = 0;
+  Object.entries(groups).forEach(([group, products]) => {
+    const div = document.createElement('div');
+    div.className = 'product-group';
+    div.innerHTML = `<div class="product-group-label">${group}</div>`;
+    products.forEach(p => {
+      const stock = getStock(p.id);
+      total += stock;
+      const row = document.createElement('div');
+      row.className = 'product-row' + (p.id === selectedId ? ' active' : '');
+      row.dataset.id   = p.id;
+      row.dataset.name = p.name.toLowerCase();
+      row.innerHTML = `
+        <span class="product-name">${p.name.replace(/^[^—]+—\s*/, '')}</span>
+        <span class="stock-badge ${stockClass(stock)}">${stock}</span>`;
+      row.onclick = () => selectProduct(p.id);
+      div.appendChild(row);
+    });
+    list.appendChild(div);
+  });
+  document.getElementById('total-units').textContent = `${total} units`;
+}
+
+function selectProduct(id) {
+  selectedId = id;
+  buildSidebar();
+  renderMain();
+}
+
+// ── MAIN PANEL ───────────────────────────────────────────────
+function renderMain() {
+  const panel = document.getElementById('main-panel');
+  if (!selectedId) {
+    panel.innerHTML = `<div class="empty-state"><div class="icon">☕</div><p>Select a product to view stock and record transactions.</p></div>`;
+    return;
+  }
+
+  const product = PRODUCTS.find(p => p.id === selectedId);
+  const entries = getEntriesFor(selectedId);
+  const stock   = getStock(selectedId);
+  const totalAdded   = entries.filter(e => e.type === 'add').reduce((s, e) => s + e.qty, 0);
+  const totalRemoved = entries.filter(e => e.type === 'remove').reduce((s, e) => s + e.qty, 0);
+  const today = new Date().toISOString().split('T')[0];
+
+  const logRows = entries.length === 0
+    ? `<tr><td colspan="5" class="empty-log">No transactions recorded yet.</td></tr>`
+    : [...entries].reverse().map(e => `
+        <tr>
+          <td>${e.date}</td>
+          <td><span class="${e.type === 'add' ? 'tag-add' : 'tag-remove'}">${e.type === 'add' ? '+' + e.qty : '−' + e.qty}</span></td>
+          <td>${e.balance}</td>
+          <td class="comment-cell">${e.comment || '<span style="color:#555">—</span>'}</td>
+          <td><button class="delete-btn" title="Delete entry" onclick="deleteEntry('${e.id}')">✕</button></td>
+        </tr>`).join('');
+
+  const connected = !!SCRIPT_URL;
+  const disabledAttr = connected ? '' : 'disabled title="Connect Google Sheets to record transactions"';
+
+  panel.innerHTML = `
+    <div class="product-title">
+      <h2>${product.name}</h2>
+      <p>${product.group}</p>
+    </div>
+    <div class="gold-line"></div>
+
+    <div class="stock-summary">
+      <div class="stat-card current"><div class="label">Current Stock</div><div class="value">${stock}</div></div>
+      <div class="stat-card added">  <div class="label">Total Added</div>  <div class="value">${totalAdded}</div></div>
+      <div class="stat-card removed"><div class="label">Total Removed</div><div class="value">${totalRemoved}</div></div>
+    </div>
+
+    <div class="transaction-form">
+      <h3>Record Transaction</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Type</label>
+          <select id="tx-type">
+            <option value="add">Add Stock</option>
+            <option value="remove">Remove Stock</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Quantity</label>
+          <input type="number" id="tx-qty" min="1" value="1">
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="tx-date" value="${today}">
+        </div>
+      </div>
+      <div class="form-row" style="grid-template-columns:1fr; margin-bottom:0;">
+        <div class="form-group">
+          <label>Comment (optional)</label>
+          <textarea id="tx-comment" placeholder="e.g. Received from supplier, Sold to Coffee Parts…"></textarea>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-add"    ${disabledAttr} onclick="recordTransaction('add')">+ Add Stock</button>
+        <button class="btn btn-remove" ${disabledAttr} onclick="recordTransaction('remove')">− Remove Stock</button>
+      </div>
+    </div>
+
+    <div class="log-section">
+      <h3>Transaction History</h3>
+      <table class="log-table">
+        <thead><tr><th>Date</th><th>Change</th><th>Balance</th><th>Comment</th><th></th></tr></thead>
+        <tbody>${logRows}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── RECORD TRANSACTION ───────────────────────────────────────
+async function recordTransaction(type) {
+  if (!SCRIPT_URL) { showToast('Connect Google Sheets first.', 'error'); return; }
+  const qty     = parseInt(document.getElementById('tx-qty').value);
+  const date    = document.getElementById('tx-date').value;
+  const comment = document.getElementById('tx-comment').value.trim();
+
+  if (!qty || qty < 1) { showToast('Enter a valid quantity.', 'error'); return; }
+  if (!date)           { showToast('Select a date.', 'error'); return; }
+
+  const currentStock = getStock(selectedId);
+  if (type === 'remove' && qty > currentStock) {
+    showToast(`Only ${currentStock} units in stock.`, 'error'); return;
+  }
+
+  const balance = type === 'add' ? currentStock + qty : currentStock - qty;
+  const entryId = Date.now().toString();
+
+  setSyncStatus('syncing', 'Saving…');
+  try {
+    await apiWrite({
+      action:    'addEntry',
+      entryId,
+      productId: selectedId,
+      type,
+      qty,
+      balance,
+      date,
+      comment,
+    });
+    showToast(type === 'add' ? `+${qty} units added.` : `−${qty} units removed.`, 'success');
+    await loadAllData();
+  } catch(e) {
+    setSyncStatus('error', 'Save failed');
+    showToast('Could not save. Check connection.', 'error');
+  }
+}
+
+// ── DELETE ENTRY ─────────────────────────────────────────────
+async function deleteEntry(entryId) {
+  if (!SCRIPT_URL) return;
+  setSyncStatus('syncing', 'Deleting…');
+  try {
+    await apiWrite({ action: 'deleteEntry', entryId });
+    showToast('Entry deleted.', 'success');
+    await loadAllData();
+  } catch(e) {
+    setSyncStatus('error', 'Delete failed');
+    showToast('Could not delete. Check connection.', 'error');
+  }
+}
+
+// ── SEARCH ───────────────────────────────────────────────────
+function filterProducts(query) {
+  const q = query.toLowerCase();
+  document.querySelectorAll('.product-row').forEach(row => {
+    row.classList.toggle('hidden', q && !row.dataset.name.includes(q));
+  });
+  document.querySelectorAll('.product-group-label').forEach(label => {
+    const group = label.parentElement;
+    const visible = [...group.querySelectorAll('.product-row')].some(r => !r.classList.contains('hidden'));
+    group.style.display = visible ? '' : 'none';
+  });
+}
+
+// ── SYNC STATUS ──────────────────────────────────────────────
+function setSyncStatus(state, label) {
+  document.getElementById('sync-dot').className   = 'sync-dot ' + state;
+  document.getElementById('sync-label').textContent = label;
+}
+
+// ── TOAST ────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = ''; }, 3000);
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+(function init() {
+  if (SCRIPT_URL) {
+    document.getElementById('setup-banner').classList.add('hidden');
+    loadAllData();
+  } else {
+    setSyncStatus('', 'Not connected');
+  }
+  buildSidebar();
+
+  // Auto-refresh every 60 seconds (keeps multiple devices in sync)
+  setInterval(() => { if (SCRIPT_URL) loadAllData(); }, 60000);
+})();
+</script>
+</body>
+</html>
